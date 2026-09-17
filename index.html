@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fitness Steps Streak Widget</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              red: '#ff2855',
+              crimson: '#e8003a',
+              coral: '#ff386b',
+              cardBg: '#18191d',
+              pillBg: '#212228',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #070608;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 页面背景：左上 → 右下 的模糊粉色辉光 */
+    .ambient-glow {
+      background:
+        radial-gradient(1100px 800px at 2% -6%, rgba(255, 90, 128, 0.34) 0%, rgba(249, 63, 109, 0.13) 34%, rgba(249, 63, 109, 0) 66%),
+        radial-gradient(900px 700px at 104% 106%, rgba(249, 63, 109, 0.20) 0%, rgba(249, 63, 109, 0.06) 38%, rgba(249, 63, 109, 0) 68%),
+        linear-gradient(135deg, rgba(255, 90, 128, 0.16) 0%, rgba(249, 63, 109, 0.07) 30%, rgba(7, 6, 8, 0) 62%),
+        #070608;
+      background-attachment: fixed;
+    }
+
+    /* 毛玻璃：主卡片 */
+    .glass-card {
+      background: linear-gradient(158deg,
+        rgba(255, 255, 255, 0.085) 0%,
+        rgba(255, 255, 255, 0.035) 40%,
+        rgba(255, 255, 255, 0.012) 100%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+      backdrop-filter: blur(28px) saturate(160%);
+    }
+
+    /* 毛玻璃：内部小卡片 */
+    .glass-inset {
+      background: linear-gradient(158deg,
+        rgba(255, 255, 255, 0.075) 0%,
+        rgba(255, 255, 255, 0.022) 100%);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      backdrop-filter: blur(16px) saturate(150%);
+    }
+
+    /* Streak 卡片内部火焰背后的柔和暗红背光（叠加毛玻璃） */
+    .flame-card-radial {
+      background:
+        radial-gradient(circle at 50% 42%,
+          rgba(249, 63, 109, 0.34) 0%,
+          rgba(249, 63, 109, 0.08) 52%,
+          rgba(249, 63, 109, 0) 76%),
+        linear-gradient(158deg,
+          rgba(255, 255, 255, 0.075) 0%,
+          rgba(255, 255, 255, 0.02) 100%);
+      -webkit-backdrop-filter: blur(18px) saturate(150%);
+      backdrop-filter: blur(18px) saturate(150%);
+    }
+
+    /* 与火焰主色 #F93F6D 一致的拟态霓虹辉光（仅 filter 呼吸，避免与跳动位移冲突） */
+    .flame-glow-effect {
+      filter: drop-shadow(0 0 16px rgba(249, 63, 109, 0.88))
+              drop-shadow(0 0 32px rgba(249, 63, 109, 0.55))
+              drop-shadow(0 0 55px rgba(249, 63, 109, 0.32));
+      animation: flame-pulse 2.8s ease-in-out infinite;
+    }
+
+    @keyframes flame-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 14px rgba(249, 63, 109, 0.78))
+                drop-shadow(0 0 28px rgba(249, 63, 109, 0.44))
+                drop-shadow(0 0 46px rgba(249, 63, 109, 0.22));
+      }
+      50% {
+        filter: drop-shadow(0 0 24px rgba(249, 63, 109, 1))
+                drop-shadow(0 0 44px rgba(249, 63, 109, 0.7))
+                drop-shadow(0 0 72px rgba(249, 63, 109, 0.4));
+      }
+    }
+
+    /* 火苗跳动：以底部为支点做不规则拉伸 + 轻微摆动 */
+    .flame-flicker {
+      transform-origin: 50% 100%;
+      animation: flame-flicker 2.2s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes flame-flicker {
+      0%   { transform: translateY(0)      scale(1, 1)         skewX(0deg)    rotate(0deg); }
+      12%  { transform: translateY(-1px)   scale(1.015, 1.045) skewX(1.2deg)  rotate(-0.4deg); }
+      25%  { transform: translateY(1px)    scale(0.985, 0.975) skewX(-1deg)   rotate(0.5deg); }
+      38%  { transform: translateY(-2px)   scale(1.02, 1.06)   skewX(1.6deg)  rotate(-0.7deg); }
+      52%  { transform: translateY(0.5px)  scale(0.995, 0.99)  skewX(-0.8deg) rotate(0.3deg); }
+      66%  { transform: translateY(-1.5px) scale(1.012, 1.05)  skewX(1deg)    rotate(-0.5deg); }
+      80%  { transform: translateY(0.5px)  scale(0.99, 0.985)  skewX(-0.6deg) rotate(0.2deg); }
+      100% { transform: translateY(0)      scale(1, 1)         skewX(0deg)    rotate(0deg); }
+    }
+
+    /* 内层白芯：更快更小幅度的独立跳动，制造火舌蹿动感 */
+    .flame-core {
+      transform-box: fill-box;
+      transform-origin: 50% 100%;
+      animation: flame-core-flicker 1.5s ease-in-out infinite;
+    }
+
+    @keyframes flame-core-flicker {
+      0%, 100% { transform: translateY(0)     scale(1, 1);        opacity: 1; }
+      20%      { transform: translateY(3px)   scale(0.97, 0.94);  opacity: 0.9; }
+      45%      { transform: translateY(-4px)  scale(1.03, 1.08);  opacity: 1; }
+      70%      { transform: translateY(1.5px) scale(0.99, 0.97);  opacity: 0.94; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .flame-flicker,
+      .flame-core,
+      .flame-glow-effect {
+        animation: none;
+      }
+    }
+
+    .widget-container-shadow {
+      box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 0.9),
+                  0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .subcard-inner-shadow {
+      box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.09),
+                  0 10px 24px -4px rgba(0, 0, 0, 0.55);
+    }
+
+    /* 自定义滑块 */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #25272e;
+      height: 6px;
+      border-radius: 9999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #ff2855;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(255, 40, 85, 0.85);
+    }
+
+    #celebrationCanvas {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 60;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen text-white flex flex-col items-center justify-center p-4 sm:p-8 ambient-glow relative select-none">
+  <canvas id="celebrationCanvas"></canvas>
+
+  <div class="w-full max-w-2xl flex flex-col items-center">
+    
+    <!-- 手机外框容器 -->
+    <div class="w-full max-w-[620px] bg-[#0d0e11]/45 p-4 sm:p-6 rounded-[44px] sm:rounded-[50px] border-[6px] sm:border-[8px] border-white/10 shadow-2xl relative">
+      
+      <!-- 主小组件卡片 (完全对应原图布局) -->
+      <div id="widgetContainer" class="w-full glass-card rounded-[34px] p-4 sm:p-5 widget-container-shadow flex flex-col sm:flex-row gap-4 sm:gap-5 items-stretch relative overflow-hidden">
+        
+        <!-- 左侧卡片：精准还原水滴火焰与打卡天数 -->
+        <div class="sm:w-[178px] flame-card-radial border border-white/[0.07] rounded-[26px] p-4 flex flex-col items-center justify-between subcard-inner-shadow text-center relative group cursor-pointer" id="streakCard" title="点击增加连胜天数">
+          
+          <!-- 水滴火焰矢量区域：直接使用设计稿 火焰.svg 的原始路径 -->
+          <div class="my-auto py-2 relative flex items-center justify-center">
+            <div class="flame-glow-effect transition-transform duration-300 group-hover:scale-105">
+              <div class="flame-flicker">
+                <svg width="92" height="104" viewBox="0 0 162 184" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <!-- 以设计稿主色 #F93F6D 为锚点的上下渐变 -->
+                    <linearGradient id="flameAssetGrad" x1="81" y1="0" x2="81" y2="184" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#FF5A80"/>
+                      <stop offset="50%" stop-color="#F93F6D"/>
+                      <stop offset="100%" stop-color="#E42557"/>
+                    </linearGradient>
+                  </defs>
+
+                  <!-- 外焰：设计稿原始路径 -->
+                  <path d="M113.5 14.4999C106.688 14.4999 99 25.3332 96 30.9999C89.1667 20.6666 72.8 0 62 0C48.5 0 0 59.5 0 96.5C0 138 21 183.5 81.5 183.5C142 183.5 161.5 135 161.5 98C161.5 61 123 14.4999 113.5 14.4999Z"
+                        fill="url(#flameAssetGrad)"/>
+
+                  <!-- 内层白芯：设计稿原始路径，独立跳动 -->
+                  <path class="flame-core"
+                        d="M111.5 90.4998C108.169 90.4998 101 102.5 93 104.5C87 104.5 75 72.9998 66.5 73C58 73.0002 41 97.1428 41 112.467C41 126.342 51.2696 148.5 80.8557 148.5C110.442 148.5 119.206 125.72 119.978 113.088C120.749 100.456 116.146 90.4998 111.5 90.4998Z"
+                        fill="white"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- 打卡天数与副标题 -->
+          <div class="mt-2 w-full">
+            <div id="streakDaysText" class="text-[23px] sm:text-[24px] font-bold tracking-tight text-white leading-none">
+              142 days
+            </div>
+            <div class="text-[13px] text-neutral-400 font-normal mt-1.5 tracking-wide">
+              Steps streak
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧区域：步数目标、超光感发光条、周打卡胶囊 -->
+        <div class="flex-1 flex flex-col justify-between py-1.5 px-1">
+          
+          <!-- 上方数据行：步数与目标 (严格还原原图左对齐布局，移除冗余百分比标签) -->
+          <div class="flex items-baseline mb-2.5">
+            <div class="flex items-baseline space-x-2">
+              <span id="currentStepsText" class="text-[34px] sm:text-[44px] font-bold tracking-tight text-white leading-none">
+                5863
+              </span>
+              <span class="text-2xl sm:text-[28px] font-light text-neutral-500 tracking-tight">
+                / <span id="goalStepsText">8000</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- 中间主发光进度条 -->
+          <div class="relative w-full h-[18px] glass-inset rounded-full p-[3px] mb-3.5 overflow-visible flex items-center">
+            <!-- 纯白光晕条 -->
+            <div id="progressBarFill"
+                 class="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                 style="width: 73.28%;">
+            </div>
+          </div>
+
+          <!-- 下方打卡星期胶囊卡片 -->
+          <div class="glass-inset border border-white/[0.08] rounded-[22px] px-2.5 sm:px-3 py-2 flex items-center justify-between subcard-inner-shadow">
+
+            <!-- Mon (已打卡) -->
+            <button onclick="toggleDay(0)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-0" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#ff386b] flex items-center justify-center shadow-md transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Mon</span>
+            </button>
+
+            <!-- Tue (已打卡) -->
+            <button onclick="toggleDay(1)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-1" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#ff386b] flex items-center justify-center shadow-md transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Tue</span>
+            </button>
+
+            <!-- Wed (已打卡) -->
+            <button onclick="toggleDay(2)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-2" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#ff386b] flex items-center justify-center shadow-md transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Wed</span>
+            </button>
+
+            <!-- Thu (未打卡) -->
+            <button onclick="toggleDay(3)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-3" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#23252c] flex items-center justify-center shadow-inner transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Thu</span>
+            </button>
+
+            <!-- Fri (未打卡) -->
+            <button onclick="toggleDay(4)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-4" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#23252c] flex items-center justify-center shadow-inner transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Fri</span>
+            </button>
+
+            <!-- Sat (未打卡) -->
+            <button onclick="toggleDay(5)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-5" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#23252c] flex items-center justify-center shadow-inner transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Sat</span>
+            </button>
+
+            <!-- Sun (未打卡) -->
+            <button onclick="toggleDay(6)" class="flex flex-col items-center focus:outline-none group transition-transform active:scale-95" title="点击切换状态">
+              <div id="day-icon-6" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#23252c] flex items-center justify-center shadow-inner transition-all">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <span class="text-[10px] sm:text-[11px] text-neutral-400 font-medium mt-1 group-hover:text-white transition-colors">Sun</span>
+            </button>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 交互调控面板 -->
+    <div class="w-full max-w-[620px] mt-6 bg-[#131418]/90 backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-xl">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/5">
+        <h3 class="text-sm font-semibold text-neutral-300 flex items-center gap-2">
+          <svg class="w-4 h-4 text-[#ff204e]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20v-6M6 20V10M18 20V4"/>
+          </svg>
+          交互控制台 (Interactive Controls)
+        </h3>
+        <span class="text-xs text-neutral-500">尝试调整步数与打卡</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <div class="flex justify-between text-xs text-neutral-400 mb-1.5">
+            <span>步数滑动 (Steps): <strong id="sliderStepVal" class="text-white">5863</strong></span>
+            <span class="text-neutral-500">上限 12000</span>
+          </div>
+          <input type="range" id="stepSlider" min="0" max="12000" step="50" value="5863" class="w-full">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs text-neutral-400 mb-1.5">
+            <span>连胜天数 (Streak): <strong id="sliderStreakVal" class="text-white">142</strong></span>
+            <span class="text-neutral-500">天</span>
+          </div>
+          <input type="range" id="streakSlider" min="1" max="365" step="1" value="142" class="w-full">
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 pt-1">
+        <button onclick="addSteps(500)" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-neutral-200 border border-white/5 transition active:scale-95">
+          +500 步
+        </button>
+        <button onclick="addSteps(1000)" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-neutral-200 border border-white/5 transition active:scale-95">
+          +1,000 步
+        </button>
+        <button onclick="reachGoal()" class="px-3 py-1.5 rounded-xl bg-[#ff2855]/20 hover:bg-[#ff2855]/30 text-xs font-medium text-[#ff3b6d] border border-[#ff2855]/30 transition active:scale-95">
+          ⚡ 直达目标 (8,000)
+        </button>
+        <button onclick="resetToOriginal()" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-neutral-400 border border-white/5 transition ml-auto">
+          重置原图数据
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Web Audio 轻量触感音效
+    let audioCtx = null;
+    function playPop(freq = 440, type = 'sine') {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.5, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    function playSuccessChime() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+          }, idx * 90);
+        });
+      } catch(e) {}
+    }
+
+    // 初始状态 (严格对应原图: 5863 步、8000 目标、142 天、周一至周三打卡)
+    const state = {
+      steps: 5863,
+      goal: 8000,
+      streak: 142,
+      days: [true, true, true, false, false, false, false],
+      hasCelebrated: false
+    };
+
+    const currentStepsEl = document.getElementById('currentStepsText');
+    const goalStepsEl = document.getElementById('goalStepsText');
+    const progressBarEl = document.getElementById('progressBarFill');
+    const streakDaysEl = document.getElementById('streakDaysText');
+    const stepSlider = document.getElementById('stepSlider');
+    const streakSlider = document.getElementById('streakSlider');
+    const sliderStepVal = document.getElementById('sliderStepVal');
+    const sliderStreakVal = document.getElementById('sliderStreakVal');
+    const streakCard = document.getElementById('streakCard');
+
+    function updateUI() {
+      currentStepsEl.innerText = state.steps;
+      goalStepsEl.innerText = state.goal;
+      sliderStepVal.innerText = state.steps;
+      stepSlider.value = state.steps;
+
+      const percentage = Math.min(100, Math.max(0, (state.steps / state.goal) * 100));
+      progressBarEl.style.width = `${percentage}%`;
+
+      if (percentage >= 100 && !state.hasCelebrated) {
+        triggerCelebration();
+        playSuccessChime();
+        state.hasCelebrated = true;
+      } else if (percentage < 100) {
+        state.hasCelebrated = false;
+      }
+
+      streakDaysEl.innerText = `${state.streak} days`;
+      sliderStreakVal.innerText = state.streak;
+      streakSlider.value = state.streak;
+
+      state.days.forEach((checked, idx) => {
+        const iconContainer = document.getElementById(`day-icon-${idx}`);
+        const checkSvg = iconContainer.querySelector('svg');
+        if (checked) {
+          iconContainer.className = "w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#ff386b] flex items-center justify-center shadow-md transition-all";
+          checkSvg.classList.remove('hidden');
+        } else {
+          iconContainer.className = "w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#23252c] flex items-center justify-center shadow-inner transition-all";
+          checkSvg.classList.add('hidden');
+        }
+      });
+    }
+
+    function toggleDay(index) {
+      playPop(520, 'sine');
+      state.days[index] = !state.days[index];
+      if (state.days[index]) {
+        state.streak += 1;
+      } else {
+        state.streak = Math.max(1, state.streak - 1);
+      }
+      updateUI();
+    }
+
+    function addSteps(amount) {
+      playPop(680, 'triangle');
+      state.steps = Math.min(12000, state.steps + amount);
+      updateUI();
+    }
+
+    function reachGoal() {
+      state.steps = state.goal;
+      updateUI();
+    }
+
+    function resetToOriginal() {
+      playPop(350, 'sine');
+      state.steps = 5863;
+      state.goal = 8000;
+      state.streak = 142;
+      state.days = [true, true, true, false, false, false, false];
+      state.hasCelebrated = false;
+      updateUI();
+    }
+
+    stepSlider.addEventListener('input', (e) => {
+      state.steps = parseInt(e.target.value);
+      updateUI();
+    });
+
+    streakSlider.addEventListener('input', (e) => {
+      state.streak = parseInt(e.target.value);
+      updateUI();
+    });
+
+    streakCard.addEventListener('click', () => {
+      playPop(600, 'sine');
+      state.streak += 1;
+      updateUI();
+    });
+
+    const canvas = document.getElementById('celebrationCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function triggerCelebration() {
+      particles = [];
+      const colors = ['#ff2855', '#ffffff', '#ff386b', '#ff6b8b', '#ff9900'];
+      for (let i = 0; i < 70; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.7) * 16,
+          size: Math.random() * 6 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 12,
+          alpha: 1
+        });
+      }
+      animateParticles();
+    }
+
+    let animationFrame = null;
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.4;
+        p.rotation += p.vRot;
+        p.alpha -= 0.015;
+
+        if (p.alpha > 0) {
+          alive = true;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+        }
+      });
+
+      if (alive) {
+        animationFrame = requestAnimationFrame(animateParticles);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cancelAnimationFrame(animationFrame);
+      }
+    }
+
+    // 首次载入渲染
+    updateUI();
+  </script>
+</body>
+</html>
